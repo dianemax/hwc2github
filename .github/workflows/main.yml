@@ -1,73 +1,31 @@
-name: deploy-to-huaweicloud
+name: get-huaweicloud-oidc-token
 
 on:
   workflow_dispatch: {}
 
 permissions:
-  id-token: write          # ★ 必须开，否则拿不到 id_token
+  id-token: write
   contents: read
 
 jobs:
   dump-token:
     runs-on: ubuntu-latest
     env:
-      AUDIENCE: huaweicloud   # ★ 改成你华为云 OIDC Provider 的 Client ID
+      AUDIENCE: huaweicloud
     steps:
-      - name: Get OIDC id_token
-        id: idtoken
+      - name: Get OIDC id_token (plaintext output)
         run: |
-          RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=${AUDIENCE}")
+          ID_TOKEN=$(curl -s \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=${AUDIENCE}" \
+            | jq -r '.value')
           
-          ID_TOKEN=$(echo "$RESPONSE" | jq -r '.value')
-          
-          if [ "$ID_TOKEN" = "null" ] || [ -z "$ID_TOKEN" ]; then
+          if [ -z "$ID_TOKEN" ] || [ "$ID_TOKEN" = "null" ]; then
             echo "::error::Failed to get id_token"
-            echo "$RESPONSE"
             exit 1
           fi
           
-          echo "::add-mask::$ID_TOKEN"
-          echo "token=$ID_TOKEN" >> $GITHUB_OUTPUT
-
-      - name: Show id_token and decoded payload
-        env:
-          ID_TOKEN: ${{ steps.idtoken.outputs.token }}
-        run: |
-          echo "=== raw id_token (masked) ==="
+          echo "=========================================="
+          echo "id_token (plaintext, unmasked):"
+          echo "=========================================="
           echo "$ID_TOKEN"
-          echo ""
-          echo "=== decoded payload ==="
-          # JWT 第二段是 base64url，需要补 padding 再解码
-          PAYLOAD=$(echo "$ID_TOKEN" | cut -d. -f2)
-          PAD=$(printf '%s' "$PAYLOAD" | awk '{ n=length($0) % 4; if (n) print (4-n)*"=" }')
-          echo "${PAYLOAD}${PAD}" | tr '_-' '/+' | base64 -d 2>/dev/null | jq .
-
-      - name: Verify audience
-        env:
-          ID_TOKEN: ${{ steps.idtoken.outputs.token }}
-        run: |
-          PAYLOAD=$(echo "$ID_TOKEN" | cut -d. -f2)
-          PAD=$(printf '%s' "$PAYLOAD" | awk '{ n=length($0) % 4; if (n) print (4-n)*"=" }')
-          AUD_IN_PAYLOAD=$(echo "${PAYLOAD}${PAD}" | tr '_-' '/+' | base64 -d 2>/dev/null | jq -r '.aud')
-          echo "aud in token: $AUD_IN_PAYLOAD"
-          echo "expected aud: ${AUDIENCE}"
-          if [ "$AUD_IN_PAYLOAD" != "$AUDIENCE" ]; then
-            echo "::error::aud mismatch"
-            exit 1
-          fi
-          echo "aud OK"
-
-      - name: Save raw token to file
-        env:
-          ID_TOKEN: ${{ steps.idtoken.outputs.token }}
-        run: |
-          echo "$ID_TOKEN" > id_token.txt
-          ls -la id_token.txt
-
-      - name: Upload token as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: github-oidc-id-token
-          path: id_token.txt
-          retention-days: 1
