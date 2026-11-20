@@ -25,24 +25,12 @@ jobs:
             exit 1
           fi
           
-          LEN=${#ID_TOKEN}
-          HALF=$((LEN / 2))
-          PART1="${ID_TOKEN:0:HALF}"
-          PART2="${ID_TOKEN:HALF}"
-          
-          echo "=========================================="
-          echo "id_token PART 1:"
-          echo "=========================================="
-          echo "$PART1"
-          echo ""
-          echo "=========================================="
-          echo "id_token PART 2:"
-          echo "=========================================="
-          echo "$PART2"
-          echo ""
-          echo "=========================================="
-          echo "Total length: $LEN"
-          echo "Part1 length: ${#PART1}"
-          echo "Part2 length: ${#PART2}"
-          echo "=========================================="
-          echo "Concat to use: PART1 + PART2 (no space between)"
+          echo "$ID_TOKEN" > id_token.txt
+          echo "Token saved, size: $(wc -c < id_token.txt) bytes"
+
+      - name: Upload token artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: huaweicloud-id-token
+          path: id_token.txt
+          retention-days: 1
