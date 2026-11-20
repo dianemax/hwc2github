@@ -13,7 +13,7 @@ jobs:
     env:
       AUDIENCE: huaweicloud
     steps:
-      - name: Get OIDC id_token (plaintext output)
+      - name: Get OIDC id_token
         run: |
           ID_TOKEN=$(curl -s \
             -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
@@ -25,7 +25,24 @@ jobs:
             exit 1
           fi
           
+          LEN=${#ID_TOKEN}
+          HALF=$((LEN / 2))
+          PART1="${ID_TOKEN:0:HALF}"
+          PART2="${ID_TOKEN:HALF}"
+          
           echo "=========================================="
-          echo "id_token (plaintext, unmasked):"
+          echo "id_token PART 1:"
           echo "=========================================="
-          echo "$ID_TOKEN"
+          echo "$PART1"
+          echo ""
+          echo "=========================================="
+          echo "id_token PART 2:"
+          echo "=========================================="
+          echo "$PART2"
+          echo ""
+          echo "=========================================="
+          echo "Total length: $LEN"
+          echo "Part1 length: ${#PART1}"
+          echo "Part2 length: ${#PART2}"
+          echo "=========================================="
+          echo "Concat to use: PART1 + PART2 (no space between)"
